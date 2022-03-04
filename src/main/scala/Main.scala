@@ -1,8 +1,17 @@
-import scala.util.{Failure, Success}
+import java.io.{File, FileWriter}
 
-object Main extends App {
-  TableParser.process("--input input.txt --output output.txt") match {
-    case Failure(exception) => exception.printStackTrace()
-    case _                  => println("Yuhu")
+object Main {
+
+  def writeFile(filename: String, line: String): Unit = {
+    val file = new File(filename)
+    val fw   = new FileWriter(file)
+    fw.write(line)
+    fw.close()
+  }
+
+  def main(args: Array[String]): Unit = {
+    val res = Solver.process(args.mkString(" "))
+    if (args.contains("--output")) writeFile(args(args.indexOf("--output") + 1), res)
+    else println(res)
   }
 }
