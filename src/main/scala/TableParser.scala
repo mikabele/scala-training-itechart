@@ -7,41 +7,44 @@ object TableParser {
   object CellParser {
     val exprPattern:    Regex = "=(.*)".r
     val strPattern:     Regex = "'(.*)".r
-    val cellNumPattern: Regex = "(\\w)+(\\d+)".r
+    val cellNumPattern: Regex = "(\\w)+(\\d+)[+\\-*/]?".r
+    val numPattern:     Regex = "(\\d)+[+\\-*/]?".r
 
-    def parseCellNum(rowCnt: Int, colCnt: Int)(cellNum: String): Int = {
-      cellNum match {
-        case cellNumPattern(colStr, rowStr) => {
-          val colLetters = colStr.split("")
-          val col = colLetters
-            .map((_, 0))
-            .reduceRight((val1, val2) => {
-              ((val1._1.toInt + val2._1.toInt * Math.pow(26, val1._2 + 1).toInt).toString, val1._2 + 1)
-            })
-            ._1
-            .toInt
-          rowStr.toInt * colCnt + col
-        }
-      }
+    def parseCellNum(rowStr: String, colStr: String)(implicit size: Size): Int = {
+      val colLetters = colStr.split("")
+      val col = colLetters
+        .map((_, 0))
+        .foldRight(("0", -1))((leftValue, rightValue) => {
+          (
+            (rightValue._1.toInt + (leftValue._1.head - 'A') * Math.pow(26, rightValue._2 + 1).toInt).toString,
+            rightValue._2 + 1
+          )
+        })
+        ._1
+        .toInt
+      (rowStr.toInt - 1) * size.colCnt + col
+
     }
 
-    def parseCellExpr(rowCnt: Int, colCnt: Int)(table: Seq[String], value: String): Cell = {
+    def parseCellExpr(table: Seq[String], value: String)(implicit size: Size): Cell = {
       value match {
         case exprPattern(expr) => {
-          val cellNumExprs = expr.split("(?=\\w+\\d+[\\+\\-\\*\\/]?)")
-          val cellValue = cellNumExprs.reduceLeft((val1, val2) => {
-            val index1 = parseCellNum(rowCnt, colCnt)(val1.dropRight(1))
-            val index2 =
-              if (val2.takeRight(1).matches("[+-*/]")) parseCellNum(rowCnt, colCnt)(val2.dropRight(1))
-              else parseCellNum(rowCnt, colCnt)(val2)
-            val res1 = parseCellExpr(rowCnt, colCnt)(table, table(index1)).result.toInt
-            val res2 = parseCellExpr(rowCnt, colCnt)(table, table(index2)).result.toInt
-            (val1.takeRight(1) match {
-              case "+" => res1 + res2
-              case "-" => res1 - res2
-              case "*" => res1 * res2
-              case "/" => res1 / res2
-            }).toString
+          val cellNumExprs = expr.split("(?<=[+\\-*/])")
+          val cellValue = cellNumExprs.foldLeft("0+")((leftValue, rightValue) => {
+            val res2 = rightValue match {
+              case numPattern(num) => num.toInt
+              case cellNumPattern(colStr, rowStr) => {
+                val index2 = parseCellNum(rowStr, colStr)
+                parseCellExpr(table, table(index2)).result.toInt
+              }
+            }
+            val nextOperator = if (rightValue.takeRight(1).matches("[+\\-*/]")) rightValue.takeRight(1) else ""
+            (leftValue.takeRight(1) match {
+              case "+" => leftValue.dropRight(1).toInt + res2
+              case "-" => leftValue.dropRight(1).toInt - res2
+              case "*" => leftValue.dropRight(1).toInt * res2
+              case "/" => leftValue.dropRight(1).toInt / res2
+            }).toString + nextOperator
           })
           Cell(cellValue)
         }
@@ -53,16 +56,20 @@ object TableParser {
 
   case class Cell(result: String)
 
-  def calculateTableValues(inputFile: String): List[String] = {
+  case class Size(rowCnt: Int, colCnt: Int)
+
+  def calculateTableValues(inputFile: String): Seq[String] = {
     readFile(inputFile) match {
       case Success(content) =>
         val rows                  = content.split("\\r\\n")
         val Array(rowNum, colNum) = rows.head.split("\\t").map(_.toInt)
-        val table                 = rows.tail.flatMap(row => row.split("\\t"))
-        val tableCells            = table.map(cell => CellParser.parseCellExpr(rowNum, colNum)(table, cell))
-      case Failure(exception) => println(exception.getMessage)
+        implicit val size: Size = Size(rowNum, colNum)
+        val table = rows.tail.flatMap(row => row.split("\\t"))
+        table.map(cell => CellParser.parseCellExpr(table, cell).result).grouped(colNum).map(_.mkString("\t")).toSeq
+      case Failure(exception) =>
+        println(exception.getMessage)
+        Nil
     }
-    Nil
   }
 
   def readFile(inputFile: String): Try[String] = {
@@ -71,17 +78,18 @@ object TableParser {
 
   def writeFile(filename: String, lines: Seq[String]): Unit = {
     val file = new File(filename)
-    val bw   = new BufferedWriter(new FileWriter(file))
+    val fw   = new FileWriter(file)
     for (line <- lines) {
-      bw.write(line)
+      fw.write(line + "\r\n")
     }
-    bw.close()
+    fw.close()
   }
 
   def process(line: String): Try[Unit] = {
     Try(line.split("\\s+").toList match {
       case "--input" :: inputFilePath :: "--output" :: outputFilePath :: Nil =>
-        writeFile(outputFilePath, calculateTableValues(inputFilePath))
+        val table = calculateTableValues(inputFilePath)
+        writeFile(outputFilePath, table)
       case "--input" :: inputFilePath :: Nil =>
         calculateTableValues(inputFilePath).foreach(println)
       case _ =>
