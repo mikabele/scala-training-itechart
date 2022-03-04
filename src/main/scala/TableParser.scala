@@ -1,4 +1,4 @@
-import java.io.{File, FileWriter}
+import java.io.File
 import scala.io.Source
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try, Using}
