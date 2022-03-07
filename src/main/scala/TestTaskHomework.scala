@@ -1,3 +1,5 @@
+import scopt.OParser
+
 import java.io.{File, FileWriter}
 import java.nio.file.{Files, Paths}
 import scala.io.Source
@@ -7,29 +9,28 @@ import scala.util.{Failure, Success, Try, Using}
 object TestTaskHomework {
 
   type ErrorMessage = String
-  val errorPrefix      = "Error: "
-  val cellErrorMessage = "#Incorrect message"
+  val errorPrefix                = "Error: "
+  val cellErrorMessage           = "#Incorrect input"
+  val englishAlphabetLetterCount = 26
+
   final case class RawSpreadsheet(size: Size, table: Seq[String])
   final case class ProcessedSpreadsheet(size: Size, cells: Seq[Cell])
   final case class Size(rowCnt: Int, colCnt: Int)
   final case class Cell(result: String)
 
-  def validateReadPath(readPath: Option[String]): Either[ErrorMessage, String] = {
-    readPath match {
-      case None => Left(errorPrefix + "Input file doesn't exist")
-      case Some(path) =>
-        if (Files.exists(Paths.get(path))) Right(path) else Left(errorPrefix + "Input file doesn't exist")
-    }
-
+  def validateReadPath(readPath: String): Either[ErrorMessage, String] = {
+    if (Files.exists(Paths.get(readPath)))
+      Right(readPath)
+    else
+      Left(errorPrefix + "Input file doesn't exist")
   }
 
-  def validateWritePath(readPath: Option[String]): Either[ErrorMessage, String] = {
-    readPath match {
-      case None => Right("console")
-      case Some(path) =>
-        val readDir = path.split("(?>/)").dropRight(1).mkString("")
-        if (Files.exists(Paths.get(readDir))) Right(path) else Left(errorPrefix + "Output file doesn't exist")
-    }
+  def validateWritePath(readPath: String): Either[ErrorMessage, String] = {
+    val readDir = readPath.split("(?>/)").dropRight(1).mkString("")
+    if (Files.exists(Paths.get(readDir)))
+      Right(readPath)
+    else
+      Left(errorPrefix + "Output file doesn't exist")
   }
 
   trait SpreadsheetParser {
@@ -41,36 +42,39 @@ object TestTaskHomework {
   }
 
   class LocalSpreadsheetParser(path: String) extends SpreadsheetParser {
-    override def parse(): Either[ErrorMessage, RawSpreadsheet] = {
-      readFile(path) match {
-        case Success(content) =>
-          val rows = content.split("\\s+").toList
-          rows match {
-            case "" :: Nil =>
-              Left(errorPrefix + "Input file is empty")
-            case rowNumStr :: colNumStr :: content =>
-              val rowNum = Try(rowNumStr.toInt)
-              val colNum = Try(colNumStr.toInt)
-              if (rowNum.isSuccess && colNum.isSuccess) {
-                val size = Size(rowNum.getOrElse(0), colNum.getOrElse(0))
-                if (content.size == size.rowCnt * size.colCnt)
-                  Right(RawSpreadsheet(size, content))
-                else
-                  Left(errorPrefix + "Table size doesn't correspond given sizes")
-              } else
-                Left(errorPrefix + "Incorrect table sizes")
-          }
-        case Failure(exception) =>
-          Left(errorPrefix + exception.getStackTrace.mkString("\r\n"))
-      }
+
+    private def validateTableSize(content: Seq[String], rowNum: Int, colNum: Int): Either[String, RawSpreadsheet] = {
+      val size = Size(rowNum, colNum)
+      if (content.size == size.rowCnt * size.colCnt)
+        Right(RawSpreadsheet(size, content))
+      else
+        Left(errorPrefix + "Table size doesn't correspond given sizes")
     }
+
+    private def parseRawContent(rows: List[String]): Either[ErrorMessage, RawSpreadsheet] = rows match {
+      case "" :: Nil =>
+        Left(errorPrefix + "Input file is empty")
+      case rowNumStr :: colNumStr :: content =>
+        val rowNum = Try(rowNumStr.toInt)
+        val colNum = Try(colNumStr.toInt)
+        if (rowNum.isSuccess && colNum.isSuccess)
+          validateTableSize(content, rowNum.getOrElse(0), colNum.getOrElse(0))
+        else
+          Left(errorPrefix + "Incorrect table sizes")
+    }
+
+    override def parse(): Either[ErrorMessage, RawSpreadsheet] = readFile(path) match {
+      case Success(content) =>
+        val rows = content.split("\\s+").toList
+        parseRawContent(rows)
+      case Failure(exception) =>
+        Left(errorPrefix + exception.getStackTrace.mkString("\r\n"))
+    }
+
   }
 
   trait SpreadsheetProcessor {
-    def process(spreadsheet:          RawSpreadsheet): ProcessedSpreadsheet
-    def parseCell(spreadsheet:        RawSpreadsheet, rawCell: String): Cell
-    def getIndexFromCell(spreadsheet: RawSpreadsheet, rowStr: String, colStr: String): Int
-    def parseCellExpr(spreadsheet:    RawSpreadsheet, cell:   String): String
+    def process(spreadsheet: RawSpreadsheet): ProcessedSpreadsheet
   }
 
   class SimpleSpreadsheetProcessor extends SpreadsheetProcessor {
@@ -82,26 +86,33 @@ object TestTaskHomework {
     val cellNumPattern: Regex = "(\\w)+(\\d+)[+\\-*/]?".r
     val numExprPattern: Regex = "(\\d)+[+\\-*/]?".r
 
-    override def getIndexFromCell(spreadsheet: RawSpreadsheet, rowStr: String, colStr: String): Int = {
+    private def addLetterToIndex(leftValue: (String, Int), rightValue: (String, Int)): (String, Int) = {
+      val (nonCalcExpr, _)       = leftValue
+      val (calcExpr, rightPower) = rightValue
+      (
+        (calcExpr.toInt + (nonCalcExpr.head - 'A') * Math
+          .pow(englishAlphabetLetterCount, rightPower + 1)
+          .toInt).toString,
+        rightPower + 1
+      )
+    }
+
+    private def getIndexFromCell(spreadsheet: RawSpreadsheet, rowStr: String, colStr: String): Int = {
       val colLetters = colStr.split("")
       val (col, _) = colLetters
         .map((_, 0))
-        .foldRight(("0", -1))((leftValue, rightValue) => {
-          val (nonCalcExpr, _)       = leftValue
-          val (calcExpr, rightPower) = rightValue
-          ((calcExpr.toInt + (nonCalcExpr.head - 'A') * Math.pow(26, rightPower + 1).toInt).toString, rightPower + 1)
-        })
+        .foldRight(("0", -1))(addLetterToIndex)
       (rowStr.toInt - 1) * spreadsheet.size.colCnt + col.toInt
     }
 
-    def checkError(x: String)(successfulFunc: String => String): String = {
+    private def checkError(x: String)(successfulFunc: String => String): String = {
       x match {
         case errorPattern(error) => error
         case _                   => successfulFunc(x)
       }
     }
 
-    def computeValue(x: String, nextOperator: String)(y: String): String = {
+    private def computeValue(x: String, nextOperator: String)(y: String): String = {
       val calcValue = x.takeRight(1) match {
         case "+" => x.dropRight(1).toInt + y.toInt
         case "-" => x.dropRight(1).toInt - y.toInt
@@ -111,34 +122,37 @@ object TestTaskHomework {
       calcValue.toString + nextOperator
     }
 
-    override def parseCellExpr(spreadsheet: RawSpreadsheet, expr: String): String = {
+    private def parseNonCalcExpression(rightValue: String, spreadsheet: RawSpreadsheet): String = rightValue match {
+      case numExprPattern(num) => num
+      case cellNumPattern(colStr, rowStr) =>
+        val index2 = getIndexFromCell(spreadsheet, rowStr, colStr)
+        parseCell(spreadsheet, spreadsheet.table(index2)).result
+    }
+
+    private def mergeTwoExpressions(rightValue: String, spreadsheet: RawSpreadsheet)(leftValue: String): String =
+      rightValue match {
+        case numExprPattern(_) | cellNumPattern(_, _) =>
+          val res2         = parseNonCalcExpression(rightValue, spreadsheet)
+          val nextOperator = if (rightValue.takeRight(1).matches("[+\\-*/]")) rightValue.takeRight(1) else ""
+          checkError(res2)(computeValue(leftValue, nextOperator))
+        case _ => cellErrorMessage
+      }
+
+    private def parseCellExpr(spreadsheet: RawSpreadsheet, expr: String): String = {
       val splitExpressions = expr.split("(?<=[+\\-*/])")
       val cellValue = splitExpressions.foldLeft("0+")((leftValue, rightValue) => {
-        checkError(leftValue)(x => {
-          rightValue match {
-            case numExprPattern(_) | cellNumPattern(_, _) =>
-              val res2 = rightValue match {
-                case numExprPattern(num) => num
-                case cellNumPattern(colStr, rowStr) =>
-                  val index2 = getIndexFromCell(spreadsheet, rowStr, colStr)
-                  parseCell(spreadsheet, spreadsheet.table(index2)).result
-              }
-              val nextOperator = if (rightValue.takeRight(1).matches("[+\\-*/]")) rightValue.takeRight(1) else ""
-              checkError(res2)(computeValue(x, nextOperator))
-            case _ => "#Incorrect input"
-          }
-        })
+        checkError(leftValue)(mergeTwoExpressions(rightValue, spreadsheet))
       })
       cellValue
     }
 
-    override def parseCell(spreadsheet: RawSpreadsheet, rawCell: String): Cell = {
+    private def parseCell(spreadsheet: RawSpreadsheet, rawCell: String): Cell = {
       rawCell match {
         case exprPattern(expr)     => Cell(parseCellExpr(spreadsheet, expr))
         case strPattern(strValue)  => Cell(strValue)
         case numPattern(value)     => Cell(value)
         case errorPattern(message) => Cell(message)
-        case _                     => Cell(s"#Incorrect input")
+        case _                     => Cell(cellErrorMessage)
       }
     }
 
@@ -177,10 +191,7 @@ object TestTaskHomework {
           .map(_.mkString("\t"))
       ) match {
         case Success(value) =>
-          writePath match {
-            case "console" => value.foreach(println)
-            case filePath  => writeFile(filePath, value.toSeq, "\r\n")
-          }
+          writeFile(writePath, value.toSeq, "\r\n")
           Right(RawSpreadsheet(processedSpreadsheet.size, processedSpreadsheet.cells.map(_.result)))
         case Failure(exception) =>
           Left(exception.getStackTrace.mkString("\r\n"))
@@ -188,17 +199,41 @@ object TestTaskHomework {
     }
   }
 
-  def main(args: Array[String]): Unit = {
-    val readPath = args.indexOf("--input") match {
-      case -1    => None
-      case index => Some(args(index + 1))
-    }
-    val writePath = args.indexOf("--output") match {
-      case -1    => None
-      case index => Some(args(index + 1))
-    }
+  case class Config(
+    input:  String = "",
+    output: String = "",
+  )
 
+  def parseArguments(args: Array[String]): Either[ErrorMessage, Config] = {
+    val builder = OParser.builder[Config]
+    val parser1 = {
+      import builder._
+      OParser.sequence(
+        programName("scopt"),
+        head("scopt", "4.x"),
+        // option -i, --input
+        opt[String]('i', "input")
+          .action((x, c) => c.copy(input = x))
+          .required()
+          .text("input is the path for input file"),
+        // option -o, --output
+        opt[String]('o', "output")
+          .action((x, c) => c.copy(output = x))
+          .required()
+          .text("output is the path for output file"),
+      )
+    }
+    OParser.parse(parser1, args, Config()) match {
+      case Some(value) => Right(value)
+      case _           => Left(errorPrefix + "Error during parsing arguments")
+    }
+  }
+
+  def main(args: Array[String]): Unit = {
     for {
+      parsedArgs     <- parseArguments(args)
+      readPath        = parsedArgs.input
+      writePath       = parsedArgs.output
       validReadPath  <- validateReadPath(readPath)
       validWritePath <- validateWritePath(writePath)
 

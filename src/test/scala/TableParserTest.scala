@@ -20,7 +20,7 @@ class TableParserTest extends AnyFunSuite {
 
   test("Test raw spreadsheets") {
     val actualSpreadsheet = for {
-      validReadPath     <- validateReadPath(Some("input.txt"))
+      validReadPath     <- validateReadPath("input.txt")
       spreadsheetParser  = new LocalSpreadsheetParser(validReadPath)
       parsedSpreadsheet <- spreadsheetParser.parse()
     } yield parsedSpreadsheet.table
@@ -41,7 +41,7 @@ class TableParserTest extends AnyFunSuite {
 
   test("Test empty input file") {
     val actualSpreadsheet = for {
-      validReadPath     <- validateReadPath(Some("src/test/testFiles/TestTask/emptyTest.txt"))
+      validReadPath     <- validateReadPath("src/test/testFiles/TestTask/emptyTest.txt")
       spreadsheetParser  = new LocalSpreadsheetParser(validReadPath)
       parsedSpreadsheet <- spreadsheetParser.parse()
     } yield parsedSpreadsheet
@@ -51,7 +51,7 @@ class TableParserTest extends AnyFunSuite {
   test("Test incorrect corresponding of table size and given sizes") {
     val actualSpreadsheet = for {
       validReadPath <- validateReadPath(
-        Some("src/test/testFiles/TestTask/miscorrespondingOfTableSizeAndGivenSizes.txt")
+        "src/test/testFiles/TestTask/miscorrespondingOfTableSizeAndGivenSizes.txt"
       )
       spreadsheetParser  = new LocalSpreadsheetParser(validReadPath)
       parsedSpreadsheet <- spreadsheetParser.parse()
@@ -61,7 +61,7 @@ class TableParserTest extends AnyFunSuite {
 
   test("Test incorrect given sizes") {
     val actualSpreadsheet = for {
-      validReadPath     <- validateReadPath(Some("src/test/testFiles/TestTask/incorrectGivenSizes.txt"))
+      validReadPath     <- validateReadPath("src/test/testFiles/TestTask/incorrectGivenSizes.txt")
       spreadsheetParser  = new LocalSpreadsheetParser(validReadPath)
       parsedSpreadsheet <- spreadsheetParser.parse()
     } yield parsedSpreadsheet
