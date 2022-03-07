@@ -44,22 +44,21 @@ object TestTaskHomework {
     override def parse(): Either[ErrorMessage, RawSpreadsheet] = {
       readFile(path) match {
         case Success(content) =>
-          val rows = content.split("\\r\\n").toList
+          val rows = content.split("\\s+").toList
           rows match {
             case "" :: Nil =>
               Left(errorPrefix + "Input file is empty")
-            case sizes :: content =>
-              Try(sizes.split("\\t").map(_.toInt)) match {
-                case Success(Array(rowNum, colNum)) =>
-                  val size  = Size(rowNum, colNum)
-                  val table = content.flatMap(row => row.split("\\t"))
-                  if (content.size == size.rowCnt && table.size == size.rowCnt * size.colCnt)
-                    Right(RawSpreadsheet(size, table))
-                  else
-                    Left(errorPrefix + "Table size doesn't correspond given sizes")
-                case Failure(_) =>
-                  Left(errorPrefix + "Incorrect table sizes")
-              }
+            case rowNumStr :: colNumStr :: content =>
+              val rowNum = Try(rowNumStr.toInt)
+              val colNum = Try(colNumStr.toInt)
+              if (rowNum.isSuccess && colNum.isSuccess) {
+                val size = Size(rowNum.getOrElse(0), colNum.getOrElse(0))
+                if (content.size == size.rowCnt * size.colCnt)
+                  Right(RawSpreadsheet(size, content))
+                else
+                  Left(errorPrefix + "Table size doesn't correspond given sizes")
+              } else
+                Left(errorPrefix + "Incorrect table sizes")
           }
         case Failure(exception) =>
           Left(errorPrefix + exception.getStackTrace.mkString("\r\n"))
