@@ -172,7 +172,7 @@ object AdtHomework {
       generatedNum: Number
     ): GameResult = generatedNum match {
       case Zero => ifZeroFunction(bet)
-      case nonZero @ NonZeroNumber(_, _, _, _, _, _) => ifNonZeroFunction(bet, nonZero)
+      case nonZero: NonZeroNumber => ifNonZeroFunction(bet, nonZero)
     }
 
     protected def loseIfZero: ((T, NonZeroNumber) => GameResult) => (T, Number) => GameResult =
@@ -272,19 +272,19 @@ object AdtHomework {
   )(
     player: Player
   ): GameResult = player.bet match {
-    case bet @ Single(_)       => SingleComparator.compare(bet, generatedNum)
-    case bet @ Split(_, _)     => SplitComparator.compare(bet, generatedNum)
-    case bet @ Street(_)       => StreetComparator.compare(bet, generatedNum)
-    case bet @ Corner(_)       => CornerComparator.compare(bet, generatedNum)
-    case bet @ DoubleStreet(_) => DoubleStreetComparator.compare(bet, generatedNum)
-    case bet @ Basket(_)       => BasketComparator.compare(bet, generatedNum)
-    case bet @ FirstFour()     => FirstFourComparator.compare(bet, generatedNum)
-    case bet @ Dozens(_)       => DozensComparator.compare(bet, generatedNum)
-    case bet @ Columns(_)      => ColumnsComparator.compare(bet, generatedNum)
-    case bet @ RedSnakeBet()   => RedSnakeBetComparator.compare(bet, generatedNum)
-    case bet @ ColorBet(_)     => ColorBetComparator.compare(bet, generatedNum)
-    case bet @ ParityBet(_)    => ParityBetComparator.compare(bet, generatedNum)
-    case bet @ RangeBet(_)     => RangeBetComparator.compare(bet, generatedNum)
+    case bet: Single       => SingleComparator.compare(bet, generatedNum)
+    case bet: Split        => SplitComparator.compare(bet, generatedNum)
+    case bet: Street       => StreetComparator.compare(bet, generatedNum)
+    case bet: Corner       => CornerComparator.compare(bet, generatedNum)
+    case bet: DoubleStreet => DoubleStreetComparator.compare(bet, generatedNum)
+    case bet: Basket       => BasketComparator.compare(bet, generatedNum)
+    case bet: FirstFour    => FirstFourComparator.compare(bet, generatedNum)
+    case bet: Dozens       => DozensComparator.compare(bet, generatedNum)
+    case bet: Columns      => ColumnsComparator.compare(bet, generatedNum)
+    case bet: RedSnakeBet  => RedSnakeBetComparator.compare(bet, generatedNum)
+    case bet: ColorBet     => ColorBetComparator.compare(bet, generatedNum)
+    case bet: ParityBet    => ParityBetComparator.compare(bet, generatedNum)
+    case bet: RangeBet     => RangeBetComparator.compare(bet, generatedNum)
   }
 
   def generateNumber(): Either[String, Number] = {

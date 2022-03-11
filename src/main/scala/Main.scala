@@ -1,6 +1,6 @@
 import AdtHomework.BetType._
 import AdtHomework.Number.NonZeroNumber
-import AdtHomework.{runGame, BetType, Color, Column, Dozen, NumberRange, Parity, Player}
+import AdtHomework._
 
 import scala.annotation.tailrec
 
