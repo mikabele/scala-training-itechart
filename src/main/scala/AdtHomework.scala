@@ -1,70 +1,77 @@
-import AdtHomework.Column.Column
-import AdtHomework.Dozen.Dozen
-import AdtHomework.NumberRange.NumberRange
+import AdtHomework.BetComparator._
+import AdtHomework.BetType._
+import AdtHomework.Color._
+import AdtHomework.GameResult._
+import AdtHomework.Number.{NonZeroNumber, Zero}
 
 import scala.util.Random
 
 object AdtHomework {
-
-  // Implement ADTs for Roulette game
-
-  // https://www.venetian.com/casino/table-games/roulette-basic-rules.html
-  // https://www.mastersofgames.com/rules/roulette-rules.htm
-
-  // Use material from adt workshop for implementation of the following data structures:
-
-  /*
-    - Number (1 - 36)
-    - Color (Red or Black)
-    - Bet Type (split, straight up, street, single number etc ...)
-    - Player
-    - GameResult
-    - others if required
-   */
-
-  // Also you need to implement roulette engine methods
-
   final case class Player(bet: BetType)
+
   sealed trait GameResult
-  final case object Win extends GameResult
-  final case object Lose extends GameResult
+  object GameResult {
+    final case object Win extends GameResult
+    final case object Lose extends GameResult
+  }
 
   sealed trait Color
-  final case object Black extends Color
-  final case object Red extends Color
+  object Color {
+    final case object Black extends Color
+    final case object Red extends Color
+  }
 
   sealed trait Parity
-  final case object Even extends Parity
-  final case object Odd extends Parity
+  object Parity {
+    final case object Even extends Parity
+    final case object Odd extends Parity
 
-  object Dozen extends Enumeration {
-    type Dozen = Value
-
-    val FIRST:  AdtHomework.Dozen.Value = Value(0)
-    val SECOND: AdtHomework.Dozen.Value = Value(1)
-    val THIRD:  AdtHomework.Dozen.Value = Value(2)
+    def apply(number: Int): Parity = if (number % 2 == 0) Even else Odd
   }
 
-  object Column extends Enumeration {
-    type Column = Value
-    val FIRST:  AdtHomework.Column.Value = Value(0)
-    val SECOND: AdtHomework.Column.Value = Value(1)
-    val THIRD:  AdtHomework.Column.Value = Value(2)
+  sealed trait Dozen
+  object Dozen {
+    final case object FirstDozen extends Dozen
+    final case object SecondDozen extends Dozen
+    final case object ThirdDozen extends Dozen
+
+    def apply(number: Int): Dozen =
+      if (number >= 1 && number <= 12) FirstDozen else if (number >= 13 && number <= 24) SecondDozen else ThirdDozen
   }
 
-  object NumberRange extends Enumeration {
-    type NumberRange = Value
+  sealed trait Column
+  object Column {
+    final case object FirstColumn extends Column
+    final case object SecondColumn extends Column
+    final case object ThirdColumn extends Column
 
-    val LOW:  AdtHomework.NumberRange.Value = Value(0)
-    val HIGH: AdtHomework.NumberRange.Value = Value(1)
+    def apply(number: Int): Column = (number - 1) % 3 match {
+      case 0 => FirstColumn
+      case 1 => SecondColumn
+      case 2 => ThirdColumn
+    }
+  }
+
+  sealed trait NumberRange
+  object NumberRange {
+    final case object Low extends NumberRange
+    final case object High extends NumberRange
+
+    def apply(number: Int): NumberRange = if (number >= 1 && number <= 18) Low else High
   }
 
   sealed trait Number
   object Number {
 
     final case object Zero extends Number
-    final case class NonZeroNumber(number: Int, color: Color, dozen: Dozen, range: NumberRange, column: Column)
-      extends Number
+    final case class NonZeroNumber(
+      number: Int,
+      color:  Color,
+      dozen:  Dozen,
+      range:  NumberRange,
+      column: Column,
+      parity: Parity
+    ) extends Number
 
     private val colorMap: Map[Int, Color] = Map(
       1  -> Red,
@@ -105,46 +112,162 @@ object AdtHomework {
       36 -> Red
     )
 
-    def apply(number: Int): Either[String, Number] = number match {
-      case number if number < 0 || number > 36 => Left("Invalid 'number' arg. It should be between 0 and 36")
-      case number if number == 0               => Right(Zero)
-      case _ =>
-        Right(
-          NonZeroNumber(
-            number,
-            colorMap(number),
-            Dozen(number / 12),
-            NumberRange(number / 18),
-            Column((number - 1) % 3)
-          )
+    def apply(number: Int): Either[String, Number] = if (number < 0 || number > 36)
+      Left("Invalid 'number' arg. It should be between 0 and 36")
+    else if (number == 0) Right(Zero)
+    else
+      Right(
+        NonZeroNumber(
+          number,
+          colorMap(number),
+          Dozen(number),
+          NumberRange(number),
+          Column(number),
+          Parity(number)
         )
-    }
+      )
+
   }
 
   sealed trait BetType
   object BetType {
-    final case class Single(value: Number)
-    final case class Split(begin: Number, end: Number)
-    final case class Street(begin: Number, end: Number)
-    final case class Corner(begin: Number, end: Number)
-    final case class DoubleStreet(begin: Number, end: Number)
-    final case class Basket(zeroCompanion: Number)
-    final case class FirstFour()
-    final case class Dozens(dozen: Dozen)
-    final case class Columns(column: Column)
-    final case class RedSnakeBet()
-    final case class ColorBet(color: Color)
-    final case class ParityBet(parity: Parity)
-    final case class RangeBet(range: Range)
+    final case class Single(value: NonZeroNumber) extends BetType
+    final case class Split(begin: NonZeroNumber, end: NonZeroNumber) extends BetType
+    final case class Street(begin: NonZeroNumber, end: NonZeroNumber) extends BetType
+    final case class Corner(begin: NonZeroNumber, end: NonZeroNumber) extends BetType
+    final case class DoubleStreet(begin: NonZeroNumber, end: NonZeroNumber) extends BetType
+    final case class Basket(zeroCompanion: NonZeroNumber) extends BetType
+    final case class FirstFour() extends BetType
+    final case class Dozens(dozen: Dozen) extends BetType
+    final case class Columns(column: Column) extends BetType
+    final case class RedSnakeBet() extends BetType
+    final case class ColorBet(color: Color) extends BetType
+    final case class ParityBet(parity: Parity) extends BetType
+    final case class RangeBet(range: NumberRange) extends BetType
   }
 
-  // Is the function below a pure function? - No, it isn't deterministic
+  sealed trait BetComparator[T <: BetType] {
+    protected def matchGeneratedNumber(
+      ifZeroFunction: T => GameResult
+    )(
+      ifNonZeroFunction: (T, NonZeroNumber) => GameResult
+    )(
+      bet:          T,
+      generatedNum: Number
+    ): GameResult = generatedNum match {
+      case Zero => ifZeroFunction(bet)
+      case nonZero @ NonZeroNumber(_, _, _, _, _, _) => ifNonZeroFunction(bet, nonZero)
+    }
+
+    protected def loseIfZero: ((T, NonZeroNumber) => GameResult) => (T, Number) => GameResult =
+      matchGeneratedNumber(_ => Lose)
+
+    protected def winIfZero: ((T, NonZeroNumber) => GameResult) => (T, Number) => GameResult =
+      matchGeneratedNumber(_ => Win)
+
+    def compare(bet: T, generatedNum: Number): GameResult
+  }
+  object BetComparator {
+    object SingleComparator extends BetComparator[Single] {
+      override def compare(bet: Single, generatedNum: Number): GameResult =
+        loseIfZero((b, n) => if (b.value.number == n.number) Win else Lose)(bet, generatedNum)
+    }
+
+    object SplitComparator extends BetComparator[Split] {
+      override def compare(bet: Split, generatedNum: Number): GameResult =
+        loseIfZero((b, n) => if (b.begin.number == n.number || n.number == b.end.number) Win else Lose)(
+          bet,
+          generatedNum
+        )
+    }
+
+    object StreetComparator extends BetComparator[Street] {
+      override def compare(bet: Street, generatedNum: Number): GameResult =
+        loseIfZero((b, n) => if (b.begin.number < n.number || n.number < b.end.number) Win else Lose)(bet, generatedNum)
+    }
+
+    object CornerComparator extends BetComparator[Corner] {
+      override def compare(bet: Corner, generatedNum: Number): GameResult = loseIfZero((b, n) =>
+        if (
+          b.begin.number == n.number || b.begin.number + 1 == n.number || b.end.number - 1 == n.number || b.end.number == n.number
+        ) Win
+        else Lose
+      )(bet, generatedNum)
+    }
+
+    object DoubleStreetComparator extends BetComparator[DoubleStreet] {
+      override def compare(bet: DoubleStreet, generatedNum: Number): GameResult =
+        loseIfZero((b, n) => if (b.begin.number < n.number || n.number < b.end.number) Win else Lose)(bet, generatedNum)
+    }
+
+    object BasketComparator extends BetComparator[Basket] {
+      override def compare(bet: Basket, generatedNum: Number): GameResult =
+        winIfZero((b, n) => if (n.number == 2 || b.zeroCompanion.number == n.number) Win else Lose)(bet, generatedNum)
+    }
+
+    object FirstFourComparator extends BetComparator[FirstFour] {
+      override def compare(bet: FirstFour, generatedNum: Number): GameResult =
+        winIfZero((_, n) => if (n.number == 1 || n.number == 2 || n.number == 3) Win else Lose)(bet, generatedNum)
+    }
+
+    object DozensComparator extends BetComparator[Dozens] {
+      override def compare(bet: Dozens, generatedNum: Number): GameResult =
+        loseIfZero((b, n) => if (b.dozen == n.dozen) Win else Lose)(bet, generatedNum)
+    }
+
+    object ColumnsComparator extends BetComparator[Columns] {
+      override def compare(bet: Columns, generatedNum: Number): GameResult =
+        loseIfZero((b, n) => if (b.column == n.column) Win else Lose)(bet, generatedNum)
+    }
+
+    object RedSnakeBetComparator extends BetComparator[RedSnakeBet] {
+
+      private val snakeNumberList = List(1, 5, 9, 12, 14, 16, 19, 23, 27, 30, 32, 34)
+
+      override def compare(bet: RedSnakeBet, generatedNum: Number): GameResult =
+        loseIfZero((_, n) => if (n.color == Red && snakeNumberList.contains(n.number)) Win else Lose)(bet, generatedNum)
+    }
+
+    object ColorBetComparator extends BetComparator[ColorBet] {
+      override def compare(bet: ColorBet, generatedNum: Number): GameResult =
+        loseIfZero((b, n) => if (b.color == n.color) Win else Lose)(bet, generatedNum)
+    }
+
+    object ParityBetComparator extends BetComparator[ParityBet] {
+      override def compare(bet: ParityBet, generatedNum: Number): GameResult =
+        loseIfZero((b, n) => if (b.parity == n.parity) Win else Lose)(bet, generatedNum)
+    }
+
+    object RangeBetComparator extends BetComparator[RangeBet] {
+      override def compare(bet: RangeBet, generatedNum: Number): GameResult =
+        loseIfZero((b, n) => if (b.range == n.range) Win else Lose)(bet, generatedNum)
+    }
+  }
+
+  def checkGameResult(
+    generatedNum: Number
+  )(
+    player: Player
+  ): GameResult = player.bet match {
+    case bet @ Single(_)          => SingleComparator.compare(bet, generatedNum)
+    case bet @ Split(_, _)        => SplitComparator.compare(bet, generatedNum)
+    case bet @ Street(_, _)       => StreetComparator.compare(bet, generatedNum)
+    case bet @ Corner(_, _)       => CornerComparator.compare(bet, generatedNum)
+    case bet @ DoubleStreet(_, _) => DoubleStreetComparator.compare(bet, generatedNum)
+    case bet @ Basket(_)          => BasketComparator.compare(bet, generatedNum)
+    case bet @ FirstFour()        => FirstFourComparator.compare(bet, generatedNum)
+    case bet @ Dozens(_)          => DozensComparator.compare(bet, generatedNum)
+    case bet @ Columns(_)         => ColumnsComparator.compare(bet, generatedNum)
+    case bet @ RedSnakeBet()      => RedSnakeBetComparator.compare(bet, generatedNum)
+    case bet @ ColorBet(_)        => ColorBetComparator.compare(bet, generatedNum)
+    case bet @ ParityBet(_)       => ParityBetComparator.compare(bet, generatedNum)
+    case bet @ RangeBet(_)        => RangeBetComparator.compare(bet, generatedNum)
+  }
+
   def generateNumber(): Either[String, Number] = {
     val randNum = Random.between(0, 37)
     Number(randNum)
   }
-
-  def checkGameResult(generatedNum: Number)(player: Player): GameResult = {}
 
   def runGame(players: List[Player]): Either[String, List[GameResult]] = {
     generateNumber() match {
@@ -154,11 +277,14 @@ object AdtHomework {
     }
   }
 
-  // add some tests via main or even unit tests to verify the game logic
-
   def main(args: Array[String]): Unit = {
     for {
-      num <- generateNumber()
-    } yield ()
+      num <- Number(25) match {
+        case Zero => Left("Generate non zero number")
+        case num @ NonZeroNumber(_, _, _, _, _, _) => Right(num)
+      }
+      player   = Player(Single(num))
+      players <- List(Player(Number(25)))
+    } runGame(List(Player(Single(Number(25)))))
   }
 }
