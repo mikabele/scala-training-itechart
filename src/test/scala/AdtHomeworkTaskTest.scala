@@ -1,7 +1,7 @@
 import AdtHomework.BetType._
 import AdtHomework.GameResult.{Lose, Win}
 import AdtHomework.Number.NonZeroNumber
-import AdtHomework.{checkGameResult, Color, Column, Dozen, Number, NumberRange, Parity, Player}
+import AdtHomework._
 import org.scalatest.funspec.AnyFunSpec
 
 class AdtHomeworkTaskTest extends AnyFunSpec {
@@ -191,7 +191,7 @@ class AdtHomeworkTaskTest extends AnyFunSpec {
       val res = for {
         successfulNum <- Number(8)
         wrongNum      <- Number(21)
-        bet            = Dozens(Dozen.FirstDozen)
+        bet           <- Dozens(1)
         player         = Player(bet)
         successfulRes  = checkGameResult(successfulNum)(player)
         wrongRes       = checkGameResult(wrongNum)(player)
@@ -205,7 +205,7 @@ class AdtHomeworkTaskTest extends AnyFunSpec {
       val res = for {
         successfulNum <- Number(8)
         wrongNum      <- Number(21)
-        bet            = Columns(Column.SecondColumn)
+        bet           <- Columns(2)
         player         = Player(bet)
         successfulRes  = checkGameResult(successfulNum)(player)
         wrongRes       = checkGameResult(wrongNum)(player)
@@ -246,7 +246,7 @@ class AdtHomeworkTaskTest extends AnyFunSpec {
       val res = for {
         successfulNum <- Number(19)
         wrongNum      <- Number(2)
-        bet            = RangeBet(NumberRange.High)
+        bet           <- RangeBet(2)
         player         = Player(bet)
         successfulRes  = checkGameResult(successfulNum)(player)
         wrongRes       = checkGameResult(wrongNum)(player)

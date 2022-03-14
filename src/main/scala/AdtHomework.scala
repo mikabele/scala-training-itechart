@@ -27,37 +27,14 @@ object AdtHomework {
     final case object Odd extends Parity
   }
 
-  sealed trait Dozen
-  object Dozen {
-    final case object FirstDozen extends Dozen
-    final case object SecondDozen extends Dozen
-    final case object ThirdDozen extends Dozen
-  }
-
-  sealed trait Column
-  object Column {
-    final case object FirstColumn extends Column
-    final case object SecondColumn extends Column
-    final case object ThirdColumn extends Column
-  }
-
-  sealed trait NumberRange
-  object NumberRange {
-    final case object Low extends NumberRange
-    final case object High extends NumberRange
-  }
-
   sealed trait Number
   object Number {
 
     final case object Zero extends Number
     sealed abstract case class NonZeroNumber private (
-      number:      Int,
-      color:       Color,
-      parity:      Parity,
-      column:      Column,
-      numberRange: NumberRange,
-      dozen:       Dozen
+      number: Int,
+      color:  Color,
+      parity: Parity
     ) extends Number
 
     object NonZeroNumber {
@@ -74,28 +51,18 @@ object AdtHomework {
         case _ => Parity.Odd
       }
 
-      private def determineColumn(number: Int): Column = (number - 1) % 3 match {
-        case 0 => Column.FirstColumn
-        case 1 => Column.SecondColumn
-        case _ => Column.ThirdColumn
-      }
+      def determineColumn(number: NonZeroNumber): Int = (number.number - 1) % 3 + 1
 
-      private def determineNumberRange(number: Int): NumberRange =
-        if (number <= 18) NumberRange.Low else NumberRange.High
+      def determineHalf(number: NonZeroNumber): Int = (number.number - 1) / 18 + 1
 
-      private def determineDozen(number: Int): Dozen = if (number <= 12) Dozen.FirstDozen
-      else if (number <= 24) Dozen.SecondDozen
-      else Dozen.ThirdDozen
+      def determineDozen(number: NonZeroNumber): Int = (number.number - 1) / 12 + 1
 
       def apply(number: Int): Either[String, NonZeroNumber] = if (number >= 1 && number <= 36)
         Right(
           new NonZeroNumber(
             number,
             determineColor(number),
-            determineParity(number),
-            determineColumn(number),
-            determineNumberRange(number),
-            determineDozen(number)
+            determineParity(number)
           ) {}
         )
       else
@@ -113,6 +80,14 @@ object AdtHomework {
   sealed trait BetType
   object BetType {
     final case class Single(value: NonZeroNumber) extends BetType
+    object Single {
+      def apply(value: Int): Either[String, Single] = Number(value) match {
+        case Right(nzn: NonZeroNumber) => Right(Single(nzn))
+        case Right(Zero) => Left("You can't select Zero")
+        case Left(e)     => Left(e)
+      }
+    }
+
     sealed abstract case class Split private (first: NonZeroNumber, second: NonZeroNumber) extends BetType
     object Split {
       def apply(first: NonZeroNumber, second: NonZeroNumber): Either[String, Split] = (first, second) match {
@@ -124,42 +99,99 @@ object AdtHomework {
           Left("First and second number don't touch")
         case _ => Right(new Split(first, second) {})
       }
+
+      def apply(first: Int, second: Int): Either[String, Split] = (Number(first), Number(second)) match {
+        case (Right(nzn1: NonZeroNumber), Right(nzn2: NonZeroNumber)) => Split(nzn1, nzn2)
+        case (_, Right(Zero)) | (Right(Zero), _) => Left("You can't select Zero")
+        case (Left(e1), _)                       => Left(e1)
+        case (_, Left(e2))                       => Left(e2)
+      }
     }
+
     sealed abstract case class Street private (begin: NonZeroNumber) extends BetType
     object Street {
       def apply(begin: NonZeroNumber): Either[String, Street] = if ((begin.number - 1) % 3 == 0)
         Right(new Street(begin) {})
       else
         Left("You should choose number from first column")
+
+      def apply(begin: Int): Either[String, Street] = Number(begin) match {
+        case Right(nzn: NonZeroNumber) => Street(nzn)
+        case Right(Zero) => Left("You can't select Zero")
+        case Left(e)     => Left(e)
+      }
     }
+
     sealed abstract case class Corner private (begin: NonZeroNumber) extends BetType
     object Corner {
       def apply(begin: NonZeroNumber): Either[String, Corner] = if ((begin.number - 1) % 3 == 2)
         Left("You should choose number from the first or the second column")
       else
         Right(new Corner(begin) {})
+
+      def apply(begin: Int): Either[String, Corner] = Number(begin) match {
+        case Right(nzn: NonZeroNumber) => Corner(nzn)
+        case Right(Zero) => Left("You can't select Zero")
+        case Left(e)     => Left(e)
+      }
     }
+
     sealed abstract case class DoubleStreet private (begin: NonZeroNumber) extends BetType
     object DoubleStreet {
       def apply(begin: NonZeroNumber): Either[String, DoubleStreet] = if ((begin.number - 1) % 3 == 0)
         Right(new DoubleStreet(begin) {})
       else
         Left("You should choose number from first column")
+
+      def apply(begin: Int): Either[String, DoubleStreet] = Number(begin) match {
+        case Right(nzn: NonZeroNumber) => DoubleStreet(nzn)
+        case Right(Zero) => Left("You can't select Zero")
+        case Left(e)     => Left(e)
+      }
     }
+
     sealed abstract case class Basket(zeroCompanion: NonZeroNumber) extends BetType
     object Basket {
       def apply(zeroCompanion: NonZeroNumber): Either[String, Basket] =
         if (zeroCompanion.number != 1 && zeroCompanion.number != 3)
           Left("You should choose 1 or 3")
         else Right(new Basket(zeroCompanion) {})
+
+      def apply(zeroCompanion: Int): Either[String, Basket] = Number(zeroCompanion) match {
+        case Right(nzn: NonZeroNumber) => Basket(nzn)
+        case Right(Zero) => Left("You can't select Zero")
+        case Left(e)     => Left(e)
+      }
     }
     final case class FirstFour() extends BetType
-    final case class Dozens(dozen: Dozen) extends BetType
-    final case class Columns(column: Column) extends BetType
+
+    sealed abstract case class Dozens private (dozen: Int) extends BetType
+    object Dozens {
+      private val validDozens = Set(1, 2, 3)
+      def apply(dozen: Int): Either[String, Dozens] = if (validDozens.contains(dozen))
+        Right(new Dozens(dozen) {})
+      else Left("Invalid Dozen value")
+    }
+
+    sealed abstract case class Columns private (column: Int) extends BetType
+    object Columns {
+      private val validColumns = Set(1, 2, 3)
+      def apply(column: Int): Either[String, Columns] = if (validColumns.contains(column))
+        Right(new Columns(column) {})
+      else
+        Left("Invalid Column value")
+    }
+
     final case class RedSnakeBet() extends BetType
     final case class ColorBet(color: Color) extends BetType
     final case class ParityBet(parity: Parity) extends BetType
-    final case class RangeBet(range: NumberRange) extends BetType
+    sealed abstract case class RangeBet private (half: Int) extends BetType
+    object RangeBet {
+      def apply(half: Int): Either[String, RangeBet] = if (half == 1 || half == 2)
+        Right(new RangeBet(half) {})
+      else
+        Left("Invalid Range value")
+    }
   }
 
   sealed trait BetComparator[T <: BetType] {
@@ -234,13 +266,13 @@ object AdtHomework {
 
     object DozensComparator extends BetComparator[Dozens] {
       override def compare(bet: Dozens, generatedNum: Number): GameResult =
-        loseIfZero((b, n) => if (b.dozen == n.dozen) Win else Lose)(bet, generatedNum)
+        loseIfZero((b, n) => if (b.dozen == NonZeroNumber.determineDozen(n)) Win else Lose)(bet, generatedNum)
     }
 
     object ColumnsComparator extends BetComparator[Columns] {
 
       override def compare(bet: Columns, generatedNum: Number): GameResult =
-        loseIfZero((b, n) => if (b.column == n.column) Win else Lose)(bet, generatedNum)
+        loseIfZero((b, n) => if (b.column == NonZeroNumber.determineColumn(n)) Win else Lose)(bet, generatedNum)
     }
 
     object RedSnakeBetComparator extends BetComparator[RedSnakeBet] {
@@ -263,7 +295,7 @@ object AdtHomework {
 
     object RangeBetComparator extends BetComparator[RangeBet] {
       override def compare(bet: RangeBet, generatedNum: Number): GameResult =
-        loseIfZero((b, n) => if (b.range == n.numberRange) Win else Lose)(bet, generatedNum)
+        loseIfZero((b, n) => if (b.half == NonZeroNumber.determineHalf(n)) Win else Lose)(bet, generatedNum)
     }
   }
 
