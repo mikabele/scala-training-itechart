@@ -123,15 +123,12 @@ object ErrorHandlingHomework {
     else
       BirthdateFromFuture.invalidNec
 
-    private def validatePerson(p: Person): AllErrorsOr[Person] = {
-      (
-        validatePersonName(p.name),
-        validateAge(p.age, p.birthDay),
-        validateBirthDate(p.birthDay),
-        validatePassportNumber(p.passportNumber)
-      )
-        .mapN(Person)
-    }
+    private def validatePerson(p: Person): AllErrorsOr[Person] = (
+      validatePersonName(p.name),
+      validateAge(p.age, p.birthDay),
+      validateBirthDate(p.birthDay),
+      validatePassportNumber(p.passportNumber)
+    ).mapN(Person)
 
     private def validatePaymentCard(p: Person, c: PaymentCard): AllErrorsOr[PaymentCard] = (
       validateCardNumber(c.cardNumber),
