@@ -11,28 +11,28 @@ import java.util.Calendar
 
 object ErrorHandlingHomework {
 
-  type Age            = Interval.Open[0, 130]
-  type BirthDay       = MatchesRegex["\\d{4}-\\d{2}-\\d{2}"]
-  type CardNumber     = MatchesRegex["\\d{4} \\d{4} \\d{4} \\d{4}"]
-  type ExpirationDate = MatchesRegex["\\d\\d/\\d\\d"]
-  type SecurityCode   = MatchesRegex["\\d{3}"]
-  type PersonName     = MatchesRegex["[A-Z]+ [A-Z]+"]
-  type PassportNumber = MatchesRegex["[A-Z]{2}\\d{7}"]
+  type Age            = Int Refined Interval.Open[0, 130]
+  type BirthDay       = String Refined MatchesRegex["\\d{4}-\\d{2}-\\d{2}"]
+  type CardNumber     = String Refined MatchesRegex["\\d{4} \\d{4} \\d{4} \\d{4}"]
+  type ExpirationDate = String Refined MatchesRegex["\\d\\d/\\d\\d"]
+  type SecurityCode   = String Refined MatchesRegex["\\d{3}"]
+  type PersonName     = String Refined MatchesRegex["[A-Z]+ [A-Z]+"]
+  type PassportNumber = String Refined MatchesRegex["[A-Z]{2}\\d{7}"]
 
   // think about adding Refined integration here to provide type level validation
   //domain classes
   final case class Account(person: Person, card: PaymentCard)
   final case class Person(
-    name:           String Refined PersonName,
-    age:            Int Refined Age,
-    birthDay:       String Refined BirthDay,
-    passportNumber: String Refined PassportNumber
+    name:           PersonName,
+    age:            Age,
+    birthDay:       BirthDay,
+    passportNumber: PassportNumber
   ) // name, age, birthDay, passportNumber
   final case class PaymentCard(
-    cardNumber:     String Refined CardNumber,
-    expirationDate: String Refined ExpirationDate,
-    cardHolder:     String Refined PersonName,
-    securityCode:   String Refined SecurityCode
+    cardNumber:     CardNumber,
+    expirationDate: ExpirationDate,
+    cardHolder:     PersonName,
+    securityCode:   SecurityCode
   ) // card number, expirationDate, securityCode etc
 
   //dto classes
@@ -90,53 +90,51 @@ object ErrorHandlingHomework {
     )(
       implicit validator: Validate[V, R]
     ): AllErrorsOr[V Refined R] =
-      refineV[R](value)(validator).left.map(_ => error).toValidatedNec
+      refineV(value)(validator).left.map(_ => error).toValidatedNec
 
-    private def validateCardNumber(number: String): AllErrorsOr[String Refined CardNumber] =
+    private def validateCardNumber(number: String): AllErrorsOr[CardNumber] =
       refinedValidation(number, InvalidCardNumber)
 
-    private def validateSecurityCode(code: String): AllErrorsOr[String Refined SecurityCode] =
+    private def validateSecurityCode(code: String): AllErrorsOr[SecurityCode] =
       refinedValidation(code, InvalidSecurityCode)
 
-    private def validateCardHolder(cardHolder: String): AllErrorsOr[String Refined PersonName] =
+    private def validateCardHolder(cardHolder: String): AllErrorsOr[PersonName] =
       refinedValidation(cardHolder, InvalidPersonName)
 
-    private def validateExpirationDate(expirationDate: String): AllErrorsOr[String Refined ExpirationDate] = {
+    private def validateExpirationDate(expirationDate: String): AllErrorsOr[ExpirationDate] = {
       def checkExpirationDateIsOver(
-        validatedExpirationDate: String Refined ExpirationDate
-      ): AllErrorsOr[String Refined ExpirationDate] = if (
-        expirationDateFormat.parse(validatedExpirationDate.value).before(dateNow)
-      )
+        validatedExpirationDate: ExpirationDate
+      ): AllErrorsOr[ExpirationDate] = if (expirationDateFormat.parse(validatedExpirationDate.value).before(dateNow))
         ExpirationDateIsOver.invalidNec
       else
         validatedExpirationDate.validNec
 
-      refinedValidation[String, ExpirationDate](expirationDate, InvalidExpirationDate).andThen(
-        checkExpirationDateIsOver
-      )
+      val refinedRes: AllErrorsOr[ExpirationDate] = refinedValidation(expirationDate, InvalidExpirationDate)
+      refinedRes.andThen(checkExpirationDateIsOver)
     }
 
-    private def validateAge(age: Int): AllErrorsOr[Int Refined Age] =
+    private def validateAge(age: Int): AllErrorsOr[Age] =
       refinedValidation(age, InvalidAge)
 
-    private def validatePersonName(name: String): AllErrorsOr[String Refined PersonName] =
+    private def validatePersonName(name: String): AllErrorsOr[PersonName] =
       refinedValidation(name, InvalidPersonName)
 
-    private def validatePassportNumber(number: String): AllErrorsOr[String Refined PassportNumber] =
+    private def validatePassportNumber(number: String): AllErrorsOr[PassportNumber] =
       refinedValidation(number, InvalidPassportNumber)
 
     private def validateBirthDate(
       birthDay: String
-    ): AllErrorsOr[String Refined BirthDay] = {
+    ): AllErrorsOr[BirthDay] = {
       def checkBirthDateIsNotFromFuture(
-        validatedBirthDay: String Refined BirthDay
-      ): AllErrorsOr[String Refined BirthDay] =
+        validatedBirthDay: BirthDay
+      ): AllErrorsOr[BirthDay] =
         if (birthDateFormat.parse(validatedBirthDay.value).before(dateNow))
           validatedBirthDay.validNec
         else
           BirthdateFromFuture.invalidNec
 
-      refinedValidation[String, BirthDay](birthDay, InvalidBirthdate).andThen(checkBirthDateIsNotFromFuture)
+      val refinedRes: AllErrorsOr[BirthDay] = refinedValidation(birthDay, InvalidBirthdate)
+      refinedRes.andThen(checkBirthDateIsNotFromFuture)
     }
 
     def validatePerson(p: PersonDto): AllErrorsOr[Person] = (
