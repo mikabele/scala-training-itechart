@@ -102,12 +102,11 @@ object ErrorHandlingHomework {
       refinedValidation(cardHolder, InvalidPersonName)
 
     private def validateExpirationDate(expirationDate: String): AllErrorsOr[ExpirationDate] = {
-      def checkExpirationDateIsOver(
-        validatedExpirationDate: ExpirationDate
-      ): AllErrorsOr[ExpirationDate] = if (expirationDateFormat.parse(validatedExpirationDate.value).before(dateNow))
-        ExpirationDateIsOver.invalidNec
-      else
-        validatedExpirationDate.validNec
+      def checkExpirationDateIsOver(validatedExpirationDate: ExpirationDate): AllErrorsOr[ExpirationDate] =
+        if (expirationDateFormat.parse(validatedExpirationDate.value).before(dateNow))
+          ExpirationDateIsOver.invalidNec
+        else
+          validatedExpirationDate.validNec
 
       val refinedRes: AllErrorsOr[ExpirationDate] = refinedValidation(expirationDate, InvalidExpirationDate)
       refinedRes.andThen(checkExpirationDateIsOver)
@@ -122,12 +121,8 @@ object ErrorHandlingHomework {
     private def validatePassportNumber(number: String): AllErrorsOr[PassportNumber] =
       refinedValidation(number, InvalidPassportNumber)
 
-    private def validateBirthDate(
-      birthDay: String
-    ): AllErrorsOr[BirthDay] = {
-      def checkBirthDateIsNotFromFuture(
-        validatedBirthDay: BirthDay
-      ): AllErrorsOr[BirthDay] =
+    private def validateBirthDate(birthDay: String): AllErrorsOr[BirthDay] = {
+      def checkBirthDateIsNotFromFuture(validatedBirthDay: BirthDay): AllErrorsOr[BirthDay] =
         if (birthDateFormat.parse(validatedBirthDay.value).before(dateNow))
           validatedBirthDay.validNec
         else
