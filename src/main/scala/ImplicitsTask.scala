@@ -125,9 +125,7 @@ object Exercise3 {
   should work on our custom HDEYears
   change the signature accordingly, add implicit instances if needed
    */
-  implicit val orderingHDEYears: Ordering[HDEYears] = new Ordering[HDEYears] {
-    override def compare(x: HDEYears, y: HDEYears): Int = x.value.compare(y.value)
-  }
+  implicit val orderingHDEYears: Ordering[HDEYears] = (x: HDEYears, y: HDEYears) => x.value.compare(y.value)
 
   def secondBiggestValue[T](values: Seq[T])(implicit order: Ordering[T]): Option[T] = Try(
     values.sorted.takeRight(2).head
@@ -223,10 +221,42 @@ object Exercise4 {
   - Set[S] - zero should be Set.empty and plus should merge sets with + operation
    */
 
+  trait Summable[T] {
+    def plus(left: T, right: T): T
+    def zero: T
+  }
+
+  object SummableInstances {
+    implicit def numericSummable[T: Numeric]: Summable[T] = new Summable[T] {
+      override def plus(left: T, right: T): T = implicitly[Numeric[T]].plus(left, right)
+
+      override def zero: T = implicitly[Numeric[T]].zero
+    }
+
+    implicit def seqSummable[T: Summable]: Summable[Seq[T]] = new Summable[Seq[T]] {
+      override def plus(left: Seq[T], right: Seq[T]): Seq[T] = left ++ right
+
+      override def zero: Seq[T] = Seq.empty
+    }
+  }
+
   /*
   Part 3.
   And finally - define generic collection sum method which works on any F[T]
   where F is Foldable (F[_]: Foldable) and T is Summable (T: Summable)!
   def genericSum... - work out the right method signature, should take F[T] and return T
    */
+  def genericSum[F[_]: Foldable, T: Summable](fc: F[T]): T =
+    implicitly[Foldable[F]].foldLeft(fc, implicitly[Summable[T]].zero)((x, y) => implicitly[Summable[T]].plus(x, y))
+
+  def main(args: Array[String]): Unit = {
+    import SummableInstances._
+
+    implicit def seqFoldable: Foldable[Seq] = new Foldable[Seq] {
+      override def foldLeft[T, S](ft: Seq[T], s: S)(f: (S, T) => S): S = ft.foldLeft(s)(f)
+    }
+
+    val testSeq = Seq(1, 2, 3, 4, 5)
+    println(genericSum(testSeq))
+  }
 }
